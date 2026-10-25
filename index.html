@@ -973,8 +973,8 @@ html.pin-locked body > *:not(#pin-lock):not(#idle-modal) { visibility: hidden !i
 </script>
 <script>
 (function () {
-  var HASH = 8563731915694895;       // 3828: siteyi açar, dinamik/statik ayarı yok
-  var HASH_LIVE = 7933552419941149;  // 6687: siteyi açar, dinamik/statik ayarı var
+  var HASH = 8563731915694895;       // siteyi açar, dinamik/statik ayarı yok
+  var HASH_LIVE = 7933552419941149;  // siteyi açar, dinamik/statik ayarı var
   function h(str) {
     var h1 = 0xdeadbeef, h2 = 0x41c6ce57, ch;
     for (var i = 0; i < str.length; i++) {
@@ -7150,7 +7150,7 @@ function closeNotesPop() {
       if (ae !== messageInput && !isField(ae) && canRefocus()) { try { messageInput.focus({ preventScroll: true }); } catch (e) {} }
     }, ms));
   });
-  // PIN başarıyla girilince (3828 ya da 6687) klavye otomatik mesaj kutusuna odaklanır
+  // PIN başarıyla girilince klavye otomatik mesaj kutusuna odaklanır
   window.addEventListener('pin-level', () => {
     kbWanted = true;
     [0, 150, 500, 1200].forEach((ms) => setTimeout(() => {
@@ -7309,7 +7309,7 @@ if (window.visualViewport) {
   const tgl = document.getElementById('live-toggle');
   lsRemove('liveMode');
 
-  // Bu bölüm yalnızca girişte 2. PIN (6687) girildiyse görünür; 1. PIN (3828) ile görünmez
+  // Bu bölüm yalnızca girişte 2. PIN girildiyse görünür; 1. PIN ile görünmez
   let allowed = false;
   function readAllowed() {
     try { return sessionStorage.getItem('pinLive') === '1'; } catch (e) { return false; }
