@@ -706,6 +706,12 @@ body.own-right .msg.own-msg .reply-preview-text { justify-content: flex-end; }
 body.own-right .msg.own-msg .time-tag { left: auto; right: 0; transform: translateX(36px); }
 body.own-right #chat-area.show-times .msg.own-msg .nick-hdr { transform: translateX(-46px); }
 body.own-right #chat-area.show-times .msg.own-msg .time-tag { transform: translateX(0); }
+/* ---- İsimsiz mesajlar (isim kutusu boş): canlı baloncukta da kesin mesajda da yatayda ortalı; mesaj yönü ayarından etkilenmez ---- */
+#chat-area .msg.no-nick:not(.chip-msg):not(.typing-msg):not([data-media-url]) { text-align: center; }
+#chat-area .msg.no-nick:not(.chip-msg):not(.typing-msg):not([data-media-url]) .msg-body { text-align: center; }
+#chat-area .msg.no-nick:not(.chip-msg):not(.typing-msg):not([data-media-url]) .react-row { justify-content: center; }
+#chat-area .msg.no-nick:not(.chip-msg):not(.typing-msg):not([data-media-url]) .reply-container { flex-direction: row; padding-left: 2px; padding-right: 0; }
+#chat-area .msg.no-nick:not(.chip-msg):not(.typing-msg):not([data-media-url]) .reply-preview-text { justify-content: center; }
 /* ---- Ayarlar içeriği ---- */
 #settings-menu { overflow: hidden; padding: 0; }
 #settings-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: calc(10px + env(safe-area-inset-top, 0px)) 14px calc(10px + env(safe-area-inset-top, 0px)); }
@@ -2366,6 +2372,14 @@ function setupConnection(c) {
     suppressReveal = wasLive;
     appendMessage(data.text, data.senderNick, false, data.reply, data.msgId);
     suppressReveal = false;
+    // Dinamik mesaj bitti: canlı baloncuktaki son hâl ile kesin mesaj arasındaki fark (henüz gelmemiş kısım) fade ile belirsin
+    if (wasLive && data.msgId && liveAnim.id === data.msgId) {
+      try {
+        const fm = document.getElementById(data.msgId);
+        const fb = fm && !fm.classList.contains('chip-msg') ? fm.querySelector('.msg-body') : null;
+        if (fb) animateLiveWords(fb, data.msgId);
+      } catch (e) {}
+    }
     noteIncomingMessage();
     if (data.msgId) {
       rememberSeenMsg(data.msgId);
