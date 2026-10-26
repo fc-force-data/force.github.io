@@ -747,8 +747,8 @@ body.no-anim #app, body.no-anim #settings-menu { transition: none !important; }
 .live-msg .msg-body { cursor: default; }
 /* Dinamik mesaj (alıcı tarafı): yeni gelen kısım 0,5 sn'de yavaşça normal tonunda belirir (parlama yok) */
 @keyframes live-word-in { from { opacity: 0; } to { opacity: 1; } }
-.live-msg .live-new { animation: live-word-in 500ms ease-out both; }
-@media (prefers-reduced-motion: reduce) { .live-msg .live-new { animation: none; } }
+.live-msg .live-new, .msg .live-new { animation: live-word-in 500ms ease-out both; }
+@media (prefers-reduced-motion: reduce) { .live-msg .live-new, .msg .live-new { animation: none; } }
 @keyframes live-pulse { 0%, 100% { background-color: var(--c-111); } 50% { background-color: var(--c-22); } }
 body.live-on #message-input { animation: live-pulse 3s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { body.live-on #message-input { animation: none; } }
