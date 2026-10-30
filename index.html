@@ -3440,6 +3440,13 @@ function buildYtCard(id, url) {
     ytSendListen({ ev: ev, msgId: msgIdOf(), ytId: id, t: Math.round((t || 0) * 100) / 100, p: p, b: st === 3 ? 1 : 0, ts: sn });
   };
   const mute = () => { muteUntil = Date.now() + 2500; };
+  // Ses kaydı sırasında şarkıyı bekletirken karşı tarafın da durması/devam etmesi için (bastırma penceresine takılmaz)
+  const sayForce = (ev, t, pl) => {
+    if (!sync) return;
+    localActAt = Date.now();
+    const sn = Date.now() + ((String(myId) < String(friendId)) ? 0 : clockOff);
+    ytSendListen({ ev: ev, msgId: msgIdOf(), ytId: id, t: Math.round((t || 0) * 100) / 100, p: pl, b: 0, ts: sn });
+  };
   // Düzeltme sarması: sarılan yer yüklenirken geçen süre (seekLag) ölçülüp hedefe eklenir; böylece art arda sarıp takılma döngüsü olmaz
   const fixSeek = (t) => { fixAt = Date.now(); fixBuf = false; mute(); try { player.seekTo(t + seekLag, true); } catch (e) {} };
   const refreshJoin = () => {
@@ -3468,7 +3475,7 @@ function buildYtCard(id, url) {
     mute();
     try {
       player.seekTo(pd.t, true);
-      if (pd.play) { wantPlay = true; player.playVideo(); } else { wantPlay = false; player.pauseVideo(); }
+      if (pd.play && !held()) { wantPlay = true; player.playVideo(); } else { wantPlay = false; player.pauseVideo(); if (pd.play) { try { ytHoldCatch(card); } catch (e) {} } }
     } catch (e) {}
   };
 
@@ -3611,8 +3618,20 @@ function buildYtCard(id, url) {
     updateLyrics(t, true);
   };
   const held = () => { try { return audHold > 0; } catch (e) { return false; } }; // ses kaydı/ses mesajı için şarkı beklemede
-  card._pause = () => { try { wantPlay = false; if (player && ready) player.pauseVideo(); } catch (e) {} };
-  card._resume = () => { try { wantPlay = true; if (player && ready) player.playVideo(); } catch (e) {} };
+  card._pause = () => {
+    let cur0 = 0;
+    try { wantPlay = false; if (player && ready) { cur0 = player.getCurrentTime() || 0; player.pauseVideo(); } } catch (e) {}
+    // Düğme/arayüz gerçek durumu göstersin (oynatıcı hiç başlamadıysa durum olayı gelmez)
+    try { card.classList.remove('is-playing', 'is-loading'); btn.innerHTML = YT_PLAY; btn.setAttribute('aria-label', 'Oynat'); stopTimer(); } catch (e) {}
+    // Ses kaydı için bekletiliyorsa karşı taraf da dursun: yoksa orada çalmaya devam edip ayrışıyor
+    try { if (sync && held()) sayForce('pause', cur0, 0); } catch (e) {}
+  };
+  card._resume = () => {
+    try {
+      wantPlay = true;
+      if (player && ready) { player.playVideo(); if (sync) sayForce('play', player.getCurrentTime() || 0, 1); }
+    } catch (e) {}
+  };
   card._destroy = () => {
     dead = true;
     try { if (sync) say('leave', 0); else if (myReady && !starting) sayRaw('unready'); } catch (e) {}
@@ -3900,8 +3919,9 @@ function buildYtCard(id, url) {
       sessStart = Date.now(); lastPeerHb = sessStart;
       tickN = 0; lastFix = 0; peerStale = false; peerHidden = false; peerBad = 0; selfBad = 0;
       refreshJoin();
-      wantPlay = true; mute();
-      try { player.playVideo(); } catch (e) {}
+      mute();
+      if (held()) { try { card._pause(); } catch (e) {} try { ytHoldCatch(card); } catch (e) {} }
+      else { wantPlay = true; try { player.playVideo(); } catch (e) {} }
       clearInterval(sessTimer); sessTimer = setInterval(sessTick, 250);
     };
     const wait = localAt - Date.now();
@@ -5149,9 +5169,8 @@ function recGuardStart() {
   clearInterval(recGuard);
   recGuard = setInterval(() => {
     if (!recMR || !recHeld) { clearInterval(recGuard); recGuard = null; return; }
-    const c = audPausedCard; if (!c) return;
-    try { if (c._getState().playing) c._pause(); } catch (e) {}
-  }, 200);
+    ytPauseAllPlaying(); // kayıt sırasında (oto oynatla vb.) başlayan her şarkıyı durdur
+  }, 100);
 }
 async function startRec() {
   if (recMR) return;
@@ -5330,6 +5349,19 @@ function audAdvance(a) {
   setTimeout(release, 1500);
   pb.click();
 }
+// Çalan (ya da tamponlanan) tüm şarkı kartlarını durdurur; ilkini kayıt bitince devam ettirmek için hatırlar
+function ytPauseAllPlaying() {
+  try {
+    document.querySelectorAll('.yt-card').forEach((c) => {
+      try {
+        if (c._getState && c._getState().playing) { c._pause(); if (!audPausedCard) audPausedCard = c; }
+      } catch (e) {}
+    });
+  } catch (e) {}
+}
+// Kayıt sırasında başlamak isteyip bekletilen şarkıyı, kayıt bitince çalsın diye işaretler
+function ytHoldCatch(c) { if (audHold > 0 && !audPausedCard) audPausedCard = c; }
+let audGuard = null;
 function songPauseForAudio() {
   audHold++;
   if (audHold !== 1) return;
@@ -5338,9 +5370,17 @@ function songPauseForAudio() {
     const c = ytCurrent;
     if (c && c._getState && c._getState().playing) { c._pause(); audPausedCard = c; }
   } catch (e) {}
+  ytPauseAllPlaying();
+  // Ses dinlenirken/kaydedilirken şarkı kendiliğinden başlarsa (oto oynatla vb.) tekrar durdur; bitince devam eder
+  clearInterval(audGuard);
+  audGuard = setInterval(() => {
+    if (audHold <= 0) { clearInterval(audGuard); audGuard = null; return; }
+    ytPauseAllPlaying();
+  }, 150);
 }
 function songResumeAfterAudio() {
   audHold = Math.max(0, audHold - 1);
+  if (audHold === 0) { clearInterval(audGuard); audGuard = null; }
   if (audHold !== 0 || !audPausedCard) return;
   const c = audPausedCard; audPausedCard = null;
   try { if (c.isConnected && !c._ended && c._resume) c._resume(); } catch (e) {}
